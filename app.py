@@ -32,7 +32,7 @@ def plot():
             dates = np.array(sensor["dates"], dtype=float)
 
             fig, ax = plt.subplots(figsize=(6,6))
-            ax.set_title(f"Tilt Meter: {str(sensor_id)}", fontsize=14, fontweight='bold', pad=34)
+            ax.set_title(f"Tilt Meter", fontsize=14, fontweight='bold', pad=34)
 
             # Determine ring spacing dynamically
             base_spacing = 0.01
