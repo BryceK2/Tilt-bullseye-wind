@@ -23,15 +23,22 @@ def plot():
 
     zip_buffer = io.BytesIO()
 
+    # Define 22 degrees counter-clockwise rotation angle in radians
+    theta_rad = np.radians(22)
+
     with zipfile.ZipFile(zip_buffer, "w") as zf:
         for sensor in sensors:
             sensor_id = sensor.get("id", "unknown")
 
-            xplot = np.array(sensor["ew"])
-            yplot = np.array(sensor["ns"])
+            x_raw = np.array(sensor["ew"])
+            y_raw = np.array(sensor["ns"])
             dates = np.array(sensor["dates"], dtype=float)
 
-            fig, ax = plt.subplots(figsize=(6,6))
+            # Apply 22° CCW rotation matrix
+            xplot = x_raw * np.cos(theta_rad) - y_raw * np.sin(theta_rad)
+            yplot = x_raw * np.sin(theta_rad) + y_raw * np.cos(theta_rad)
+
+            fig, ax = plt.subplots(figsize=(6, 6))
             ax.set_title(f"Tilt Meter", fontsize=14, fontweight='bold', pad=34)
 
             # Determine ring spacing dynamically
@@ -47,8 +54,8 @@ def plot():
             spacing = base_spacing * scale_factor
             radii = [round(spacing * i, 4) for i in range(1, 4)]
 
-            # # Draw circles
-            label_offset = spacing * 0.02  # small fraction of spacing
+            # Draw circles
+            label_offset = spacing * 0.02
             offset = spacing * 0.5 + 0.005
             for r in radii:
                 theta = np.linspace(0, 2*np.pi, 300)
@@ -73,7 +80,7 @@ def plot():
             )
             sc.set_clim(1, 365)
 
-             # Colorbar with month ticks
+            # Colorbar with month ticks
             month_starts = [1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335]
             month_labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", 
                             "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
