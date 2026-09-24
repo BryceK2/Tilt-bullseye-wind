@@ -39,7 +39,7 @@ def plot():
             yplot = x_raw * np.sin(theta_rad) + y_raw * np.cos(theta_rad)
 
             fig, ax = plt.subplots(figsize=(6, 6))
-            ax.set_title(f"Tilt Meter", fontsize=14, fontweight='bold', pad=34)
+            ax.set_title(f"Tilt-Meter", fontsize=14, fontweight='bold', pad=34)
 
             # Determine ring spacing dynamically
             base_spacing = 0.01
