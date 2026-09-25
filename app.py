@@ -23,23 +23,27 @@ def plot():
 
     zip_buffer = io.BytesIO()
 
-    # Define 22 degrees counter-clockwise rotation angle in radians
+    # Define 22 degrees counter-clockwise rotation angle in radians for tilt data
     theta_rad = np.radians(22)
 
     with zipfile.ZipFile(zip_buffer, "w") as zf:
         for sensor in sensors:
             sensor_id = sensor.get("id", "unknown")
 
-            x_raw = np.array(sensor["ew"])
-            y_raw = np.array(sensor["ns"])
+            x_raw = np.array(sensor["ew"], dtype=float)
+            y_raw = np.array(sensor["ns"], dtype=float)
             dates = np.array(sensor["dates"], dtype=float)
 
-            # Apply 22° CCW rotation matrix
+            # Extract optional wind data
+            wind_gusts = np.array(sensor.get("wind_gust", []), dtype=float)
+            wind_dirs = np.array(sensor.get("wind_direction", []), dtype=float)
+
+            # Apply 22° CCW rotation matrix ONLY to tilt data points
             xplot = x_raw * np.cos(theta_rad) - y_raw * np.sin(theta_rad)
             yplot = x_raw * np.sin(theta_rad) + y_raw * np.cos(theta_rad)
 
             fig, ax = plt.subplots(figsize=(6, 6))
-            ax.set_title(f"Tilt Meter", fontsize=14, fontweight='bold', pad=34)
+            ax.set_title(f"Tilt Meter: {sensor_id}", fontsize=14, fontweight='bold', pad=34)
 
             # Determine ring spacing dynamically
             base_spacing = 0.01
@@ -79,6 +83,36 @@ def plot():
                 zorder=3
             )
             sc.set_clim(1, 365)
+
+            # Draw Wind Arrows (Unrotated Direction)
+            if len(wind_gusts) == len(xplot) and len(wind_dirs) == len(xplot):
+                # Filter indices where wind gust is >= 20
+                mask = wind_gusts >= 20
+                if np.any(mask):
+                    x_wind = xplot[mask]  # Arrow starts at the rotated tilt point
+                    y_wind = yplot[mask]
+                    dirs = wind_dirs[mask]
+
+                    # Standard meteorological compass bearing to polar angle (0° = North, 90° = East)
+                    # NO 22° rotation added here
+                    wind_polar_deg = 90 - dirs
+                    wind_rad = np.radians(wind_polar_deg)
+
+                    # Unit vector components in original orientation
+                    u = np.cos(wind_rad)
+                    v = np.sin(wind_rad)
+
+                    # Plot arrows in original wind orientation
+                    ax.quiver(
+                        x_wind, y_wind, u, v,
+                        color='red',
+                        scale=25,
+                        width=0.005,
+                        headwidth=4,
+                        headlength=5,
+                        zorder=5,
+                        label='Wind Gust ≥ 20'
+                    )
 
             # Colorbar with month ticks
             month_starts = [1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335]
