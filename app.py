@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import io
 import zipfile
+import sys
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
@@ -47,15 +48,14 @@ def plot():
             raw_gusts = sensor.get("wind_gust", [])
             wind_gusts = safe_float_array(raw_gusts)
 
-            # --- DEBUG LOGGING FOR CLOUD RUN ---
-            print(f"=== [DEBUG] SENSOR: {sensor_id} ===")
-            print(f"[DEBUG] Raw wind_gust length: {len(raw_gusts)}")
-            print(f"[DEBUG] Raw wind_gust sample (first 5): {raw_gusts[:5]}")
-            print(f"[DEBUG] Parsed non-NaN count: {np.count_nonzero(~np.isnan(wind_gusts))}")
-            if len(wind_gusts) > 0:
-                print(f"[DEBUG] Max gust parsed: {np.nanmax(wind_gusts)}")
-                print(f"[DEBUG] Count >= 20: {np.sum(np.nan_to_num(wind_gusts) >= 20)}")
-            # ------------------------------------
+            # Force immediate flush to Cloud Run logs via stderr
+print(f"=== [DEBUG] SENSOR: {sensor_id} ===", file=sys.stderr, flush=True)
+print(f"[DEBUG] Raw wind_gust length: {len(raw_gusts)}", file=sys.stderr, flush=True)
+print(f"[DEBUG] Raw wind_gust sample (first 5): {raw_gusts[:5]}", file=sys.stderr, flush=True)
+print(f"[DEBUG] Parsed non-NaN count: {np.count_nonzero(~np.isnan(wind_gusts))}", file=sys.stderr, flush=True)
+if len(wind_gusts) > 0:
+    print(f"[DEBUG] Max gust parsed: {np.nanmax(wind_gusts)}", file=sys.stderr, flush=True)
+    print(f"[DEBUG] Count >= 20: {np.sum(np.nan_to_num(wind_gusts) >= 20)}", file=sys.stderr, flush=True)
 
             # Apply 22° CCW rotation matrix
             xplot = x_raw * np.cos(theta_rad) - y_raw * np.sin(theta_rad)
