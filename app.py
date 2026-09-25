@@ -97,45 +97,45 @@ def plot():
             sc.set_clim(1, 365)
 
             # Overlay Tiny Wind Direction Arrows for High Wind Gusts (≥ 20 mph)
-if len(wind_gusts) > 0 and len(wind_dirs) > 0:
-    min_len = min(len(xplot), len(wind_gusts), len(wind_dirs))
-    x_sub = xplot[:min_len]
-    y_sub = yplot[:min_len]
-    gusts_sub = wind_gusts[:min_len]
-    dirs_sub = wind_dirs[:min_len]
+            if len(wind_gusts) > 0 and len(wind_dirs) > 0:
+                min_len = min(len(xplot), len(wind_gusts), len(wind_dirs))
+                x_sub = xplot[:min_len]
+                y_sub = yplot[:min_len]
+                gusts_sub = wind_gusts[:min_len]
+                dirs_sub = wind_dirs[:min_len]
 
-    valid_gusts = np.nan_to_num(gusts_sub, nan=0.0)
-    mask = (valid_gusts >= 20.0) & (~np.isnan(dirs_sub))
+                # Filter points where gust >= 20 and wind direction is valid
+                valid_gusts = np.nan_to_num(gusts_sub, nan=0.0)
+                mask = (valid_gusts >= 20.0) & (~np.isnan(dirs_sub))
 
-    if np.any(mask):
-        x_high = x_sub[mask]
-        y_high = y_sub[mask]
-        dirs_high = dirs_sub[mask]
+                if np.any(mask):
+                    x_high = x_sub[mask]
+                    y_high = y_sub[mask]
+                    dirs_high = dirs_sub[mask]
 
-        # Convert true compass degrees (0=North, 90=East) to math polar angle
-        wind_math_deg = (90 - dirs_high) % 360
-        wind_math_rad = np.radians(wind_math_deg)
+                    # Convert true compass degrees (0=North, 90=East) directly to math polar angle
+                    wind_math_deg = (90 - dirs_high) % 360
+                    wind_math_rad = np.radians(wind_math_deg)
 
-        # Draw tiny fixed-point arrows pointing IN the wind direction
-        # length_points controls the length of the arrow in absolute pixels
-        arrow_len_pixels = 6.0 
+                    # Fixed pixel length (6pt) ensures tiny, consistent arrows across any axis scale
+                    arrow_len_pixels = 6.0
 
-        for x_pt, y_pt, rad in zip(x_high, y_high, wind_math_rad):
-            dx = np.cos(rad) * arrow_len_pixels
-            dy = np.sin(rad) * arrow_len_pixels
+                    for x_pt, y_pt, rad in zip(x_high, y_high, wind_math_rad):
+                        dx = np.cos(rad) * arrow_len_pixels
+                        dy = np.sin(rad) * arrow_len_pixels
 
-            ax.annotate(
-                '', 
-                xy=(x_pt, y_pt),                      # Arrow tip position
-                xytext=(-dx, -dy),                    # Tail offset in points
-                textcoords='offset points',
-                arrowprops=dict(
-                    arrowstyle='->,head_length=0.2,head_width=0.15',
-                    color='black',
-                    lw=0.8
-                ),
-                zorder=10
-            )
+                        ax.annotate(
+                            '',
+                            xy=(x_pt, y_pt),                      # Arrow tip
+                            xytext=(-dx, -dy),                    # Tail offset
+                            textcoords='offset points',
+                            arrowprops=dict(
+                                arrowstyle='->,head_length=0.2,head_width=0.15',
+                                color='black',
+                                lw=0.8
+                            ),
+                            zorder=10                             # Renders above all scatter dots
+                        )
 
             # Colorbar
             month_starts = [1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335]
