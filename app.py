@@ -34,43 +34,29 @@ def plot():
         return jsonify({"error": "No sensor data provided"}), 400
 
     zip_buffer = io.BytesIO()
-    theta_rad = np.radians(22)
 
     with zipfile.ZipFile(zip_buffer, "w") as zf:
         for sensor in sensors:
             sensor_id = sensor.get("id", "unknown")
 
+            # Dynamic CCW rotation for TILT DATA ONLY (defaults to 22)
+            rotation_deg = float(sensor.get("rotationCCW", 22))
+            theta_rad = np.radians(rotation_deg)
+
             x_raw = safe_float_array(sensor.get("ew", []))
             y_raw = safe_float_array(sensor.get("ns", []))
             dates = safe_float_array(sensor.get("dates", []))
 
-            raw_gusts = sensor.get("wind_gust", [])
-            wind_gusts = safe_float_array(raw_gusts)
+            # Raw and parsed wind data
+            wind_gusts = safe_float_array(sensor.get("wind_gust", []))
+            wind_dirs = safe_float_array(sensor.get("wind_direction", []))
 
-            # Find first occurrence >= 20
-            first_20_info = "None"
-            valid_gusts = np.nan_to_num(wind_gusts, nan=0.0)
-            over_20_indices = np.where(valid_gusts >= 20)[0]
-
-            if len(over_20_indices) > 0:
-                idx = over_20_indices[0]
-                val = wind_gusts[idx]
-                first_20_info = f"Idx {idx}: {val} mph"
-
-            # 22° CCW rotation
+            # Apply CCW rotation matrix strictly to tilt coordinates
             xplot = x_raw * np.cos(theta_rad) - y_raw * np.sin(theta_rad)
             yplot = x_raw * np.sin(theta_rad) + y_raw * np.cos(theta_rad)
 
             fig, ax = plt.subplots(figsize=(6, 6))
-            
-            # Display array len, max gust, and first >= 20 instance in the title
-            max_g = np.nanmax(wind_gusts) if len(wind_gusts) > 0 else 0
-            title_text = (
-                f"Tilt Meter: {sensor_id}\n"
-                f"Gust Array Len: {len(wind_gusts)} | Max: {max_g} mph\n"
-                f"First >=20: {first_20_info}"
-            )
-            ax.set_title(title_text, fontsize=11, fontweight='bold', pad=15)
+            ax.set_title(f"Tilt Meter: {sensor_id}", fontsize=14, fontweight='bold', pad=34)
 
             # Determine ring spacing dynamically
             base_spacing = 0.01
@@ -110,19 +96,40 @@ def plot():
             )
             sc.set_clim(1, 365)
 
-            # Overlay Black Dots for High Wind Gusts (≥ 20 mph)
-            if len(wind_gusts) > 0:
-                min_len = min(len(xplot), len(wind_gusts))
+            # Overlay Small Wind Direction Arrows for High Wind Gusts (≥ 20 mph)
+            if len(wind_gusts) > 0 and len(wind_dirs) > 0:
+                min_len = min(len(xplot), len(wind_gusts), len(wind_dirs))
                 x_sub = xplot[:min_len]
                 y_sub = yplot[:min_len]
-                gusts_sub = valid_gusts[:min_len]
+                gusts_sub = wind_gusts[:min_len]
+                dirs_sub = wind_dirs[:min_len]
 
-                mask = gusts_sub >= 20.0
+                # Filter points where gust >= 20 and wind direction is valid
+                valid_gusts = np.nan_to_num(gusts_sub, nan=0.0)
+                mask = (valid_gusts >= 20.0) & (~np.isnan(dirs_sub))
+
                 if np.any(mask):
-                    ax.scatter(
-                        x_sub[mask], y_sub[mask],
+                    x_high = x_sub[mask]
+                    y_high = y_sub[mask]
+                    dirs_high = dirs_sub[mask]
+
+                    # Convert true compass degrees (0=North, 90=East) directly to math polar angle
+                    wind_math_deg = (90 - dirs_high) % 360
+                    wind_math_rad = np.radians(wind_math_deg)
+
+                    # Direction vectors
+                    u = np.cos(wind_math_rad)
+                    v = np.sin(wind_math_rad)
+
+                    # Plot very small arrows
+                    ax.quiver(
+                        x_high, y_high, u, v,
                         color='black',
-                        s=35,
+                        scale=35,            # Arrow size scaling
+                        width=0.005,         # Shaft width
+                        headwidth=3.5,       # Head width
+                        headlength=4,        # Head length
+                        pivot='middle',      # Centered on point
                         zorder=5
                     )
 
