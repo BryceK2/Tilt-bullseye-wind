@@ -43,13 +43,12 @@ def plot():
             y_raw = safe_float_array(sensor.get("ns", []))
             dates = safe_float_array(sensor.get("dates", []))
 
-            # Robust extraction of optional wind data
+            # Extract wind gust data
             wind_gusts = safe_float_array(sensor.get("wind_gust", []))
-            wind_dirs = safe_float_array(sensor.get("wind_direction", []))
 
-            # Debug logging (Check these in your server/Cloud Run logs)
+            # Debug logging
             print(f"--- [DEBUG] Processing Sensor: {sensor_id} ---")
-            print(f"xplot len: {len(x_raw)}, wind_gusts len: {len(wind_gusts)}, wind_dirs len: {len(wind_dirs)}")
+            print(f"xplot len: {len(x_raw)}, wind_gusts len: {len(wind_gusts)}")
             if len(wind_gusts) > 0:
                 print(f"Max Gust Value parsed: {np.nanmax(wind_gusts)}")
 
@@ -84,7 +83,7 @@ def plot():
             ax.plot([-radii[2], radii[2]], [0, 0], color='black', lw=1, zorder=0)
             ax.plot([0, 0], [-radii[2], radii[2]], color='black', lw=1, zorder=0)
 
-            # Scatter Plot
+            # Colored Tilt Scatter Plot (zorder=3, size=50)
             dates_dt = np.array([excel_to_datetime(d) for d in dates])
             day_of_year = np.array([d.timetuple().tm_yday for d in dates_dt])
             
@@ -98,44 +97,27 @@ def plot():
             )
             sc.set_clim(1, 365)
 
-            # Draw Wind Arrows
-            if len(wind_gusts) > 0 and len(wind_dirs) > 0:
-                # Ensure array bounds match exactly
-                min_len = min(len(xplot), len(wind_gusts), len(wind_dirs))
+            # Overlay Black Dots for High Wind Gusts (≥ 20 mph)
+            if len(wind_gusts) > 0:
+                min_len = min(len(xplot), len(wind_gusts))
                 
                 x_sub = xplot[:min_len]
                 y_sub = yplot[:min_len]
                 gusts_sub = wind_gusts[:min_len]
-                dirs_sub = wind_dirs[:min_len]
 
-                # Filter valid numbers >= 20
+                # Filter points where gust >= 20
                 mask = np.nan_to_num(gusts_sub, nan=0.0) >= 20
                 print(f"[DEBUG] Points passing >= 20 threshold: {np.sum(mask)}")
 
                 if np.any(mask):
-                    x_wind = x_sub[mask]
-                    y_wind = y_sub[mask]
-                    dirs = dirs_sub[mask]
+                    x_dots = x_sub[mask]
+                    y_dots = y_sub[mask]
 
-                    # Standard meteorological compass bearing (0° N, 90° E)
-                    wind_polar_deg = 90 - dirs
-                    wind_rad = np.radians(wind_polar_deg)
-
-                    u = np.cos(wind_rad)
-                    v = np.sin(wind_rad)
-
-                    # Scale arrow relative to plot grid
-                    arrow_length = radii[0] * 0.35
-
-                    ax.quiver(
-                        x_wind, y_wind, u, v,
-                        color='red',
-                        angles='xy',
-                        scale_units='xy',
-                        scale=1 / arrow_length,
-                        width=0.007,
-                        headwidth=4,
-                        headlength=5,
+                    # Plot black dots directly on top of the tilt points
+                    ax.scatter(
+                        x_dots, y_dots,
+                        color='black',
+                        s=20,
                         zorder=5
                     )
 
