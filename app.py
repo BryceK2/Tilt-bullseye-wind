@@ -19,7 +19,7 @@ def safe_float_array(arr_data):
     cleaned = []
     for val in arr_data:
         try:
-            cleaned.append(float(val))
+            cleaned.append(float(str(val).strip()))
         except (ValueError, TypeError):
             cleaned.append(np.nan)
     return np.array(cleaned, dtype=float)
@@ -43,14 +43,19 @@ def plot():
             y_raw = safe_float_array(sensor.get("ns", []))
             dates = safe_float_array(sensor.get("dates", []))
 
-            # Extract wind gust data
-            wind_gusts = safe_float_array(sensor.get("wind_gust", []))
+            # Extract raw and parsed wind gust data
+            raw_gusts = sensor.get("wind_gust", [])
+            wind_gusts = safe_float_array(raw_gusts)
 
-            # Debug logging
-            print(f"--- [DEBUG] Processing Sensor: {sensor_id} ---")
-            print(f"xplot len: {len(x_raw)}, wind_gusts len: {len(wind_gusts)}")
+            # --- DEBUG LOGGING FOR CLOUD RUN ---
+            print(f"=== [DEBUG] SENSOR: {sensor_id} ===")
+            print(f"[DEBUG] Raw wind_gust length: {len(raw_gusts)}")
+            print(f"[DEBUG] Raw wind_gust sample (first 5): {raw_gusts[:5]}")
+            print(f"[DEBUG] Parsed non-NaN count: {np.count_nonzero(~np.isnan(wind_gusts))}")
             if len(wind_gusts) > 0:
-                print(f"Max Gust Value parsed: {np.nanmax(wind_gusts)}")
+                print(f"[DEBUG] Max gust parsed: {np.nanmax(wind_gusts)}")
+                print(f"[DEBUG] Count >= 20: {np.sum(np.nan_to_num(wind_gusts) >= 20)}")
+            # ------------------------------------
 
             # Apply 22° CCW rotation matrix
             xplot = x_raw * np.cos(theta_rad) - y_raw * np.sin(theta_rad)
@@ -107,17 +112,16 @@ def plot():
 
                 # Filter points where gust >= 20
                 mask = np.nan_to_num(gusts_sub, nan=0.0) >= 20
-                print(f"[DEBUG] Points passing >= 20 threshold: {np.sum(mask)}")
 
                 if np.any(mask):
                     x_dots = x_sub[mask]
                     y_dots = y_sub[mask]
 
-                    # Plot black dots directly on top of the tilt points
+                    # Plot solid black dots directly on top of the tilt points
                     ax.scatter(
                         x_dots, y_dots,
                         color='black',
-                        s=20,
+                        s=25,
                         zorder=5
                     )
 
