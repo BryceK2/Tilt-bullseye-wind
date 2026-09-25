@@ -9,9 +9,20 @@ from datetime import datetime, timedelta
 
 app = Flask(__name__)
 
-# Convert Excel serial date → datetime
 def excel_to_datetime(excel_date):
     return datetime(1899, 12, 30) + timedelta(days=float(excel_date))
+
+def safe_float_array(arr_data):
+    """Safely parses any list/array to float numpy array, converting invalid entries to NaN."""
+    if not arr_data:
+        return np.array([], dtype=float)
+    cleaned = []
+    for val in arr_data:
+        try:
+            cleaned.append(float(val))
+        except (ValueError, TypeError):
+            cleaned.append(np.nan)
+    return np.array(cleaned, dtype=float)
 
 @app.route('/plot', methods=['POST'])
 def plot():
@@ -22,23 +33,27 @@ def plot():
         return jsonify({"error": "No sensor data provided"}), 400
 
     zip_buffer = io.BytesIO()
-
-    # Define 22 degrees counter-clockwise rotation angle in radians for tilt data
     theta_rad = np.radians(22)
 
     with zipfile.ZipFile(zip_buffer, "w") as zf:
         for sensor in sensors:
             sensor_id = sensor.get("id", "unknown")
 
-            x_raw = np.array(sensor["ew"], dtype=float)
-            y_raw = np.array(sensor["ns"], dtype=float)
-            dates = np.array(sensor["dates"], dtype=float)
+            x_raw = safe_float_array(sensor.get("ew", []))
+            y_raw = safe_float_array(sensor.get("ns", []))
+            dates = safe_float_array(sensor.get("dates", []))
 
-            # Safely convert wind arrays, replacing invalid non-numeric entries with NaN
-            wind_gusts = np.array([float(val) if isinstance(val, (int, float, str)) and str(val).strip().replace('.', '', 1).isdigit() else np.nan for val in sensor.get("wind_gust", [])])
-            wind_dirs = np.array([float(val) if isinstance(val, (int, float, str)) and str(val).strip().replace('.', '', 1).isdigit() else np.nan for val in sensor.get("wind_direction", [])])
+            # Robust extraction of optional wind data
+            wind_gusts = safe_float_array(sensor.get("wind_gust", []))
+            wind_dirs = safe_float_array(sensor.get("wind_direction", []))
 
-            # Apply 22° CCW rotation matrix ONLY to tilt data points
+            # Debug logging (Check these in your server/Cloud Run logs)
+            print(f"--- [DEBUG] Processing Sensor: {sensor_id} ---")
+            print(f"xplot len: {len(x_raw)}, wind_gusts len: {len(wind_gusts)}, wind_dirs len: {len(wind_dirs)}")
+            if len(wind_gusts) > 0:
+                print(f"Max Gust Value parsed: {np.nanmax(wind_gusts)}")
+
+            # Apply 22° CCW rotation matrix
             xplot = x_raw * np.cos(theta_rad) - y_raw * np.sin(theta_rad)
             yplot = x_raw * np.sin(theta_rad) + y_raw * np.cos(theta_rad)
 
@@ -48,9 +63,8 @@ def plot():
             # Determine ring spacing dynamically
             base_spacing = 0.01
             radial_distances = np.sqrt(xplot**2 + yplot**2)
-            max_tilt = radial_distances.max()
+            max_tilt = radial_distances.max() if len(radial_distances) > 0 else 0.03
 
-            # Calculate scale_factor 
             scale_factor = int(np.ceil(max_tilt / 0.03))
             if scale_factor < 1:
                 scale_factor = 1
@@ -70,7 +84,7 @@ def plot():
             ax.plot([-radii[2], radii[2]], [0, 0], color='black', lw=1, zorder=0)
             ax.plot([0, 0], [-radii[2], radii[2]], color='black', lw=1, zorder=0)
 
-            # Convert dates to day-of-year for fixed Jan–Dec coloring
+            # Scatter Plot
             dates_dt = np.array([excel_to_datetime(d) for d in dates])
             day_of_year = np.array([d.timetuple().tm_yday for d in dates_dt])
             
@@ -84,25 +98,33 @@ def plot():
             )
             sc.set_clim(1, 365)
 
-            # Draw Wind Arrows with Fixed Cartesian Scale Parameters
+            # Draw Wind Arrows
             if len(wind_gusts) > 0 and len(wind_dirs) > 0:
-                # Filter for valid numeric gust values >= 20
-                mask = np.nan_to_num(wind_gusts, nan=0.0) >= 20
+                # Ensure array bounds match exactly
+                min_len = min(len(xplot), len(wind_gusts), len(wind_dirs))
+                
+                x_sub = xplot[:min_len]
+                y_sub = yplot[:min_len]
+                gusts_sub = wind_gusts[:min_len]
+                dirs_sub = wind_dirs[:min_len]
+
+                # Filter valid numbers >= 20
+                mask = np.nan_to_num(gusts_sub, nan=0.0) >= 20
+                print(f"[DEBUG] Points passing >= 20 threshold: {np.sum(mask)}")
 
                 if np.any(mask):
-                    x_wind = xplot[mask]
-                    y_wind = yplot[mask]
-                    dirs = wind_dirs[mask]
+                    x_wind = x_sub[mask]
+                    y_wind = y_sub[mask]
+                    dirs = dirs_sub[mask]
 
-                    # Standard meteorological direction conversion: (0° N, 90° E)
+                    # Standard meteorological compass bearing (0° N, 90° E)
                     wind_polar_deg = 90 - dirs
                     wind_rad = np.radians(wind_polar_deg)
 
-                    # Compute direction vector components
                     u = np.cos(wind_rad)
                     v = np.sin(wind_rad)
 
-                    # Fixed physical vector length = 35% of inner ring radius
+                    # Scale arrow relative to plot grid
                     arrow_length = radii[0] * 0.35
 
                     ax.quiver(
@@ -111,13 +133,13 @@ def plot():
                         angles='xy',
                         scale_units='xy',
                         scale=1 / arrow_length,
-                        width=0.006,
+                        width=0.007,
                         headwidth=4,
                         headlength=5,
                         zorder=5
                     )
 
-            # Colorbar with month ticks
+            # Colorbar
             month_starts = [1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335]
             month_labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", 
                             "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -133,21 +155,15 @@ def plot():
             ax.set_ylim(-limit, limit)
             ax.set_aspect('equal')
 
-            # Remove box
             for spine in ax.spines.values():
                 spine.set_visible(False)
             ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
 
-            # Labels (positioned just outside outer ring + scaled offset)
             label_offset_factor = 2.5
-            ax.text(0, radii[-1] + label_offset*label_offset_factor, "North",
-                    ha='center', va='bottom', fontsize=12, fontweight='bold')
-            ax.text(0, -radii[-1] - label_offset*label_offset_factor, "South",
-                    ha='center', va='top', fontsize=12, fontweight='bold')
-            ax.text(radii[-1] + label_offset*label_offset_factor, 0, "East",
-                    ha='left', va='center', fontsize=12, fontweight='bold')
-            ax.text(-radii[-1] - label_offset*label_offset_factor, 0, "West",
-                    ha='right', va='center', fontsize=12, fontweight='bold')
+            ax.text(0, radii[-1] + label_offset*label_offset_factor, "North", ha='center', va='bottom', fontsize=12, fontweight='bold')
+            ax.text(0, -radii[-1] - label_offset*label_offset_factor, "South", ha='center', va='top', fontsize=12, fontweight='bold')
+            ax.text(radii[-1] + label_offset*label_offset_factor, 0, "East", ha='left', va='center', fontsize=12, fontweight='bold')
+            ax.text(-radii[-1] - label_offset*label_offset_factor, 0, "West", ha='right', va='center', fontsize=12, fontweight='bold')
 
             plt.tight_layout()
             plt.subplots_adjust(right=0.85, bottom=0.15, top=0.90)
@@ -161,10 +177,4 @@ def plot():
             zf.writestr(f"{sensor_id}.png", buf.read())
 
     zip_buffer.seek(0)
-
-    return send_file(
-        zip_buffer,
-        mimetype='application/zip',
-        as_attachment=True,
-        download_name='tilt_plots.zip'
-    )
+    return send_file(zip_buffer, mimetype='application/zip', as_attachment=True, download_name='tilt_plots.zip')
