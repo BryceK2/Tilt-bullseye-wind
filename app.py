@@ -44,25 +44,33 @@ def plot():
             y_raw = safe_float_array(sensor.get("ns", []))
             dates = safe_float_array(sensor.get("dates", []))
 
-            # Extract raw and parsed wind gust data
             raw_gusts = sensor.get("wind_gust", [])
             wind_gusts = safe_float_array(raw_gusts)
 
-            # Force immediate flush to Cloud Run logs via stderr
-print(f"=== [DEBUG] SENSOR: {sensor_id} ===", file=sys.stderr, flush=True)
-print(f"[DEBUG] Raw wind_gust length: {len(raw_gusts)}", file=sys.stderr, flush=True)
-print(f"[DEBUG] Raw wind_gust sample (first 5): {raw_gusts[:5]}", file=sys.stderr, flush=True)
-print(f"[DEBUG] Parsed non-NaN count: {np.count_nonzero(~np.isnan(wind_gusts))}", file=sys.stderr, flush=True)
-if len(wind_gusts) > 0:
-    print(f"[DEBUG] Max gust parsed: {np.nanmax(wind_gusts)}", file=sys.stderr, flush=True)
-    print(f"[DEBUG] Count >= 20: {np.sum(np.nan_to_num(wind_gusts) >= 20)}", file=sys.stderr, flush=True)
+            # Find first occurrence >= 20
+            first_20_info = "None"
+            valid_gusts = np.nan_to_num(wind_gusts, nan=0.0)
+            over_20_indices = np.where(valid_gusts >= 20)[0]
 
-            # Apply 22° CCW rotation matrix
+            if len(over_20_indices) > 0:
+                idx = over_20_indices[0]
+                val = wind_gusts[idx]
+                first_20_info = f"Idx {idx}: {val} mph"
+
+            # 22° CCW rotation
             xplot = x_raw * np.cos(theta_rad) - y_raw * np.sin(theta_rad)
             yplot = x_raw * np.sin(theta_rad) + y_raw * np.cos(theta_rad)
 
             fig, ax = plt.subplots(figsize=(6, 6))
-            ax.set_title(f"Tilt Meter: {sensor_id}", fontsize=14, fontweight='bold', pad=34)
+            
+            # Display array len, max gust, and first >= 20 instance in the title
+            max_g = np.nanmax(wind_gusts) if len(wind_gusts) > 0 else 0
+            title_text = (
+                f"Tilt Meter: {sensor_id}\n"
+                f"Gust Array Len: {len(wind_gusts)} | Max: {max_g} mph\n"
+                f"First >=20: {first_20_info}"
+            )
+            ax.set_title(title_text, fontsize=11, fontweight='bold', pad=15)
 
             # Determine ring spacing dynamically
             base_spacing = 0.01
@@ -88,7 +96,7 @@ if len(wind_gusts) > 0:
             ax.plot([-radii[2], radii[2]], [0, 0], color='black', lw=1, zorder=0)
             ax.plot([0, 0], [-radii[2], radii[2]], color='black', lw=1, zorder=0)
 
-            # Colored Tilt Scatter Plot (zorder=3, size=50)
+            # Colored Scatter
             dates_dt = np.array([excel_to_datetime(d) for d in dates])
             day_of_year = np.array([d.timetuple().tm_yday for d in dates_dt])
             
@@ -105,23 +113,16 @@ if len(wind_gusts) > 0:
             # Overlay Black Dots for High Wind Gusts (≥ 20 mph)
             if len(wind_gusts) > 0:
                 min_len = min(len(xplot), len(wind_gusts))
-                
                 x_sub = xplot[:min_len]
                 y_sub = yplot[:min_len]
-                gusts_sub = wind_gusts[:min_len]
+                gusts_sub = valid_gusts[:min_len]
 
-                # Filter points where gust >= 20
-                mask = np.nan_to_num(gusts_sub, nan=0.0) >= 20
-
+                mask = gusts_sub >= 20.0
                 if np.any(mask):
-                    x_dots = x_sub[mask]
-                    y_dots = y_sub[mask]
-
-                    # Plot solid black dots directly on top of the tilt points
                     ax.scatter(
-                        x_dots, y_dots,
+                        x_sub[mask], y_sub[mask],
                         color='black',
-                        s=25,
+                        s=35,
                         zorder=5
                     )
 
