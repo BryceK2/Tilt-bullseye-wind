@@ -82,7 +82,7 @@ def plot():
             ax.plot([-radii[2], radii[2]], [0, 0], color='black', lw=1, zorder=0)
             ax.plot([0, 0], [-radii[2], radii[2]], color='black', lw=1, zorder=0)
 
-            # Colored Scatter
+            # Colored Scatter (zorder=3)
             dates_dt = np.array([excel_to_datetime(d) for d in dates])
             day_of_year = np.array([d.timetuple().tm_yday for d in dates_dt])
             
@@ -96,7 +96,7 @@ def plot():
             )
             sc.set_clim(1, 365)
 
-            # Overlay Small Wind Direction Arrows for High Wind Gusts (≥ 20 mph)
+            # Overlay Tiny Wind Direction Arrows for High Wind Gusts (≥ 20 mph)
             if len(wind_gusts) > 0 and len(wind_dirs) > 0:
                 min_len = min(len(xplot), len(wind_gusts), len(wind_dirs))
                 x_sub = xplot[:min_len]
@@ -117,20 +117,23 @@ def plot():
                     wind_math_deg = (90 - dirs_high) % 360
                     wind_math_rad = np.radians(wind_math_deg)
 
-                    # Direction vectors
+                    # Unit directional vectors
                     u = np.cos(wind_math_rad)
                     v = np.sin(wind_math_rad)
 
-                    # Plot very small arrows
+                    # Plot tiny arrows pinned on top (zorder=10 ensures they sit above all scatter dots)
                     ax.quiver(
                         x_high, y_high, u, v,
                         color='black',
-                        scale=35,            # Arrow size scaling
-                        width=0.005,         # Shaft width
-                        headwidth=3.5,       # Head width
-                        headlength=4,        # Head length
-                        pivot='middle',      # Centered on point
-                        zorder=5
+                        scale_units='xy',    # Lock scale relative to plot axes
+                        angles='xy',         # Lock angle calculation to plot axes
+                        scale=150,           # High scale value = very small arrows
+                        width=0.003,         # Thin shaft
+                        headwidth=3,         # Narrow head
+                        headlength=3.5,      # Short head
+                        headaxislength=3,
+                        pivot='middle',      # Center arrow on coordinate
+                        zorder=10            # Prevents newer scatter dots from covering arrows
                     )
 
             # Colorbar
