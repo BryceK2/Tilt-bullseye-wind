@@ -39,8 +39,8 @@ def plot():
         for sensor in sensors:
             sensor_id = sensor.get("id", "unknown")
 
-            # Dynamic CCW rotation for TILT DATA ONLY (defaults to 22)
-            rotation_deg = float(sensor.get("rotationCCW", 22))
+            # Dynamic CCW rotation for TILT DATA ONLY (defaults to 0)
+            rotation_deg = float(sensor.get("rotationCCW", 0))
             theta_rad = np.radians(rotation_deg)
 
             x_raw = safe_float_array(sensor.get("ew", []))
@@ -50,6 +50,7 @@ def plot():
             # Raw and parsed wind data
             wind_gusts = safe_float_array(sensor.get("wind_gust", []))
             wind_dirs = safe_float_array(sensor.get("wind_direction", []))
+            wind_gust_min = float(sensor.get("wind_gust_minimum", 0)
 
             # Apply CCW rotation matrix strictly to tilt coordinates
             xplot = x_raw * np.cos(theta_rad) - y_raw * np.sin(theta_rad)
@@ -104,9 +105,9 @@ def plot():
                 gusts_sub = wind_gusts[:min_len]
                 dirs_sub = wind_dirs[:min_len]
 
-                # Filter points where gust >= 20 and wind direction is valid
+                # Filter points where gust >= wind_gust_min and wind direction is valid
                 valid_gusts = np.nan_to_num(gusts_sub, nan=0.0)
-                mask = (valid_gusts >= 20.0) & (~np.isnan(dirs_sub))
+                mask = (valid_gusts >= wind_gust_min) & (~np.isnan(dirs_sub))
 
                 if np.any(mask):
                     x_high = x_sub[mask]
