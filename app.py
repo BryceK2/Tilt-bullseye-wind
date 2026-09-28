@@ -50,7 +50,7 @@ def plot():
             # Raw and parsed wind data
             wind_gusts = safe_float_array(sensor.get("wind_gust", []))
             wind_dirs = safe_float_array(sensor.get("wind_direction", []))
-            wind_gust_min = float(sensor.get("wind_gust_minimum", 0)
+            wind_gust_min = float(sensor.get("wind_gust_minimum", 0))
 
             # Apply CCW rotation matrix strictly to tilt coordinates
             xplot = x_raw * np.cos(theta_rad) - y_raw * np.sin(theta_rad)
@@ -97,7 +97,7 @@ def plot():
             )
             sc.set_clim(1, 365)
 
-            # Overlay Tiny Wind Direction Arrows for High Wind Gusts (≥ 20 mph)
+            # Overlay Tiny Wind Direction Arrows for High Wind Gusts (≥ wind_gust_min mph)
             if len(wind_gusts) > 0 and len(wind_dirs) > 0:
                 min_len = min(len(xplot), len(wind_gusts), len(wind_dirs))
                 x_sub = xplot[:min_len]
