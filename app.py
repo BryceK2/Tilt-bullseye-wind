@@ -114,7 +114,7 @@ def plot():
                     cbar.set_ticks(month_starts)
                     cbar.set_ticklabels(month_labels)
 
-                # Overlay Tiny Wind Direction Arrows for High Wind Gusts (≥ wind_gust_min mph)
+                # Overlay Wind Direction Arrows scaled by Wind Gust
                 if len(wind_gusts) > 0 and len(wind_dirs) > 0:
                     min_len = min(len(xplot), len(wind_gusts), len(wind_dirs))
                     x_sub = xplot[:min_len]
@@ -122,37 +122,47 @@ def plot():
                     gusts_sub = wind_gusts[:min_len]
                     dirs_sub = wind_dirs[:min_len]
 
-                    # Filter points where gust >= wind_gust_min and wind direction is valid
+                    # Filter points where gust >= wind_gust_min and direction is valid
                     valid_gusts = np.nan_to_num(gusts_sub, nan=0.0)
                     mask = (valid_gusts >= wind_gust_min) & (~np.isnan(dirs_sub))
 
                     if np.any(mask):
                         x_high = x_sub[mask]
                         y_high = y_sub[mask]
+                        gusts_high = gusts_sub[mask]
                         dirs_high = dirs_sub[mask]
 
-                        # Convert true compass degrees (0=North, 90=East) directly to math polar angle
+                        # Convert compass degrees (0=North, 90=East) to polar angle
                         wind_math_deg = (90 - dirs_high) % 360
                         wind_math_rad = np.radians(wind_math_deg)
 
-                        # Fixed pixel length (6pt) ensures tiny, consistent arrows across any axis scale
-                        arrow_len_pixels = 6.0
+                        # Scaling Parameters:
+                        # 15 mph maps to ~4pt tail length
+                        # 40 mph maps to ~18pt tail length
+                        # Rate of length increase per mph = (18 - 4) / (40 - 15) = 0.56 pt/mph
+                        min_gust_ref = 15.0
+                        min_tail_pt = 4.0
+                        scale_rate = 0.56  # points per mph
 
-                        for x_pt, y_pt, rad in zip(x_high, y_high, wind_math_rad):
-                            dx = np.cos(rad) * arrow_len_pixels
-                            dy = np.sin(rad) * arrow_len_pixels
+                        # Linear scale with no upper bound (e.g. 80 mph will scale to 4 + (80-15)*0.56 = 40.4 pt)
+                        # np.maximum ensures values lower than 15 mph don't produce negative lengths
+                        arrow_lengths = min_tail_pt + np.maximum(0, gusts_high - min_gust_ref) * scale_rate
+
+                        for x_pt, y_pt, rad, tail_len in zip(x_high, y_high, wind_math_rad, arrow_lengths):
+                            dx = np.cos(rad) * tail_len
+                            dy = np.sin(rad) * tail_len
 
                             ax.annotate(
                                 '',
-                                xy=(x_pt, y_pt),                      # Arrow tip
-                                xytext=(-dx, -dy),                    # Tail offset
+                                xy=(x_pt, y_pt),                      # Arrow tip at data point
+                                xytext=(-dx, -dy),                    # Scaled tail offset
                                 textcoords='offset points',
                                 arrowprops=dict(
                                     arrowstyle='->,head_length=0.2,head_width=0.15',
                                     color='black',
                                     lw=0.8
                                 ),
-                                zorder=10                             # Renders above all scatter dots
+                                zorder=10                             # Render above scatter points
                             )
 
                 # Formatting
