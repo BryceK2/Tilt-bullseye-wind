@@ -361,7 +361,7 @@ def plot():
                     left=0.08, right=0.82, bottom=0.20, top=0.88
                 )
 
-                # Save image using a sanitized filename for zip safety
+                # Save image using sanitized filename and dpi=100 (750x750 px = 562,500 pixels total)
                 safe_filename = (
                     ''.join(
                         c
@@ -375,7 +375,7 @@ def plot():
                     safe_filename = f'plot_{idx + 1}'
 
                 buf = io.BytesIO()
-                plt.savefig(buf, format='png', dpi=150, transparent=True)
+                plt.savefig(buf, format='png', dpi=100, transparent=True)
                 plt.close(fig)
                 buf.seek(0)
 
@@ -397,3 +397,4 @@ def plot():
             flush=True,
         )
         return jsonify({'error': str(e), 'traceback': error_msg}), 500
+        
