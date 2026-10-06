@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta
 import io
 import sys
-import textwrap
 import traceback
 import zipfile
 from flask import Flask, jsonify, request, send_file
@@ -71,24 +70,36 @@ def plot():
 
                 fig, ax = plt.subplots(figsize=(7.5, 7.5))
 
-                # Format title: break line before Phase if present, otherwise wrap at width=32
+                # Strictly format title onto two lines
                 if ' Phase' in sensor_id:
-                    parts = sensor_id.split(' Phase')
-                    formatted_title = (
-                        f'{textwrap.fill(parts[0], width=32)}\nPhase{parts[1]}'
-                    )
+                    parts = sensor_id.split(' Phase', 1)
+                    formatted_title = f"{parts[0].strip()}\nPhase {parts[1].strip().lstrip(': ')}"
+                elif '\n' in sensor_id:
+                    formatted_title = sensor_id
                 else:
-                    formatted_title = textwrap.fill(sensor_id, width=32)
+                    words = sensor_id.split()
+                    if len(words) > 1:
+                        mid = len(words) // 2
+                        formatted_title = (
+                            f"{' '.join(words[:mid])}\n{' '.join(words[mid:])}"
+                        )
+                    else:
+                        formatted_title = sensor_id
 
-                ax.set_title(
-                    formatted_title, fontsize=11, fontweight='bold', pad=18
+                # Center title over the ENTIRE figure image
+                fig.suptitle(
+                    formatted_title,
+                    fontsize=11,
+                    fontweight='bold',
+                    x=0.5,
+                    y=0.93,
                 )
 
                 # Fixed radial scale: 0.02°, 0.04°, 0.06°
                 radii = [0.02, 0.04, 0.06]
                 max_r = radii[-1]
 
-                # Draw concentric circles & labels (smaller font 7pt, not bold, shifted slightly left)
+                # Draw concentric circles & labels
                 theta = np.linspace(0, 2 * np.pi, 300)
                 for r in radii:
                     ax.plot(
@@ -282,63 +293,16 @@ def plot():
                     fontweight='bold',
                 )
 
-                # --- Legend Box: 30 mph and 40 mph Reference Arrows ---
-                ax_leg = fig.add_axes([0.08, 0.02, 0.35, 0.16])
+                # --- Legend Box: 40 mph Reference Arrow Only ---
+                ax_leg = fig.add_axes([0.08, 0.02, 0.35, 0.12])
                 ax_leg.set_xlim(0, 1)
                 ax_leg.set_ylim(0, 1)
                 ax_leg.axis('off')
 
                 ref_angle_rad = np.radians(45)
 
-                # 1. 30 mph Reference Arrow
-                dot30_x, dot30_y = 0.15, 0.70
-                ax_leg.scatter(
-                    [dot30_x],
-                    [dot30_y],
-                    color='mediumturquoise',
-                    s=30,
-                    zorder=3,
-                )
-
-                ref30_gust = 30.0
-                ref30_len_pt = (
-                    min_tail_pt
-                    + max(0.0, ref30_gust - min_gust_ref) * scale_rate
-                )
-                dx30_pt = np.cos(ref_angle_rad) * ref30_len_pt
-                dy30_pt = np.sin(ref_angle_rad) * ref30_len_pt
-
-                trans_leg30 = offset_copy(
-                    ax_leg.transData,
-                    fig=fig,
-                    x=dx30_pt / 2.0,
-                    y=dy30_pt / 2.0,
-                    units='points',
-                )
-                ax_leg.annotate(
-                    '',
-                    xy=(dot30_x, dot30_y),
-                    xycoords=trans_leg30,
-                    xytext=(-dx30_pt, -dy30_pt),
-                    textcoords='offset points',
-                    arrowprops=dict(
-                        arrowstyle='->,head_length=0.2,head_width=0.15',
-                        color='black',
-                        lw=0.8,
-                    ),
-                    zorder=4,
-                )
-                ax_leg.text(
-                    dot30_x + 0.18,
-                    dot30_y - 0.05,
-                    '30 mph',
-                    fontsize=8,
-                    va='center',
-                    fontweight='bold',
-                )
-
-                # 2. 40 mph Reference Arrow
-                dot40_x, dot40_y = 0.15, 0.25
+                # 40 mph Reference Arrow
+                dot40_x, dot40_y = 0.15, 0.50
                 ax_leg.scatter(
                     [dot40_x],
                     [dot40_y],
@@ -384,12 +348,12 @@ def plot():
                     fontweight='bold',
                 )
 
-                # Adjusted figure margins to ensure title and labels are well within bounds
+                # Subplot margins adjusted to leave clean room for centered title
                 plt.subplots_adjust(
-                    left=0.12, right=0.82, bottom=0.18, top=0.84
+                    left=0.10, right=0.82, bottom=0.18, top=0.82
                 )
 
-                # Save image using sanitized filename (dpi=100 ensures image size < 1MB)
+                # Save image using sanitized filename
                 safe_filename = (
                     ''.join(
                         c
