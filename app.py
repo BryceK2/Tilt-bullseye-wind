@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 import io
 import sys
+import textwrap
 import traceback
 import zipfile
 from flask import Flask, jsonify, request, send_file
@@ -49,7 +50,6 @@ def plot():
 
         with zipfile.ZipFile(zip_buffer, 'w') as zf:
             for idx, sensor in enumerate(sensors):
-                # Using the full string passed in 'id' directly as the plot title
                 sensor_id = sensor.get('id', f'sensor_{idx + 1}')
 
                 # Dynamic CCW rotation for TILT DATA ONLY (defaults to 0)
@@ -71,14 +71,21 @@ def plot():
 
                 fig, ax = plt.subplots(figsize=(7.5, 7.5))
 
-                # Set plot title directly to sensor_id
-                ax.set_title(sensor_id, fontsize=11, fontweight='bold', pad=20)
+                # Format long titles onto multiple lines
+                if ' Phase' in sensor_id:
+                    formatted_title = sensor_id.replace(' Phase', '\nPhase')
+                else:
+                    formatted_title = textwrap.fill(sensor_id, width=45)
+
+                ax.set_title(
+                    formatted_title, fontsize=11, fontweight='bold', pad=20
+                )
 
                 # Fixed radial scale: 0.02°, 0.04°, 0.06°
                 radii = [0.02, 0.04, 0.06]
                 max_r = radii[-1]
 
-                # Draw concentric circles & reduced-size labels close to rings
+                # Draw concentric circles & place labels to the right of ring lines
                 theta = np.linspace(0, 2 * np.pi, 300)
                 for r in radii:
                     ax.plot(
@@ -89,10 +96,10 @@ def plot():
                         zorder=1,
                     )
                     ax.text(
-                        r,
+                        r + 0.0015,
                         -0.0035,
                         f'{r:.2f}°',
-                        ha='center',
+                        ha='left',
                         va='top',
                         fontsize=8,
                         fontweight='bold',
@@ -272,19 +279,19 @@ def plot():
                     fontweight='bold',
                 )
 
-                # --- Clear Legend Box with 20 mph Reference Arrow ---
-                ax_leg = fig.add_axes([0.05, 0.02, 0.50, 0.16])
+                # --- Legend Area with 30 mph Reference Arrow (Text Labels Deleted) ---
+                ax_leg = fig.add_axes([0.08, 0.04, 0.35, 0.12])
                 ax_leg.set_xlim(0, 1)
                 ax_leg.set_ylim(0, 1)
                 ax_leg.axis('off')
 
-                # Dot & 20 mph reference arrow pointing ~45 degrees (NE)
-                dot_x, dot_y = 0.08, 0.75
+                # Dot & 30 mph reference arrow pointing ~45 degrees (NE)
+                dot_x, dot_y = 0.20, 0.40
                 ax_leg.scatter(
                     [dot_x], [dot_y], color='mediumturquoise', s=30, zorder=3
                 )
 
-                ref_gust = 20.0
+                ref_gust = 30.0  # Updated to 30 mph
                 ref_len_pt = (
                     min_tail_pt
                     + max(0.0, ref_gust - min_gust_ref) * scale_rate
@@ -315,53 +322,29 @@ def plot():
                     zorder=4,
                 )
 
-                # Reference arrow text labels
+                # Reference arrow labels (N indicator & 30 mph speed)
                 ax_leg.text(
-                    dot_x - 0.03,
-                    dot_y + 0.12,
+                    dot_x - 0.05,
+                    dot_y + 0.25,
                     'N',
-                    fontsize=7,
+                    fontsize=8,
                     color='red',
                     fontweight='bold',
                 )
                 ax_leg.text(
-                    dot_x + 0.08,
-                    dot_y - 0.06,
-                    '20 mph',
-                    fontsize=8,
+                    dot_x + 0.18,
+                    dot_y - 0.10,
+                    '30 mph',
+                    fontsize=9,
                     va='center',
                     fontweight='bold',
                 )
 
-                # Explanatory legend descriptions
-                ax_leg.text(
-                    0.28,
-                    0.75,
-                    'Dot position: Combined tilt response (degrees)',
-                    fontsize=8,
-                    va='center',
-                )
-                ax_leg.text(
-                    0.00,
-                    0.45,
-                    'Arrow angle: wind gust direction relative to monument'
-                    ' north (degrees)',
-                    fontsize=8,
-                    va='center',
-                )
-                ax_leg.text(
-                    0.00,
-                    0.18,
-                    'Arrow length: wind gust (mph)',
-                    fontsize=8,
-                    va='center',
-                )
-
                 plt.subplots_adjust(
-                    left=0.08, right=0.82, bottom=0.20, top=0.88
+                    left=0.08, right=0.82, bottom=0.18, top=0.88
                 )
 
-                # Save image using sanitized filename and dpi=100 (750x750 px = 562,500 pixels total)
+                # Save image using sanitized filename (dpi=100 ensures < 1M total pixels)
                 safe_filename = (
                     ''.join(
                         c
@@ -397,4 +380,3 @@ def plot():
             flush=True,
         )
         return jsonify({'error': str(e), 'traceback': error_msg}), 500
-        
