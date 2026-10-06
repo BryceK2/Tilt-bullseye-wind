@@ -71,21 +71,24 @@ def plot():
 
                 fig, ax = plt.subplots(figsize=(7.5, 7.5))
 
-                # Format long titles onto multiple lines
+                # Format title: break line before Phase if present, otherwise wrap at width=32
                 if ' Phase' in sensor_id:
-                    formatted_title = sensor_id.replace(' Phase', '\nPhase')
+                    parts = sensor_id.split(' Phase')
+                    formatted_title = (
+                        f'{textwrap.fill(parts[0], width=32)}\nPhase{parts[1]}'
+                    )
                 else:
-                    formatted_title = textwrap.fill(sensor_id, width=45)
+                    formatted_title = textwrap.fill(sensor_id, width=32)
 
                 ax.set_title(
-                    formatted_title, fontsize=11, fontweight='bold', pad=20
+                    formatted_title, fontsize=11, fontweight='bold', pad=18
                 )
 
                 # Fixed radial scale: 0.02°, 0.04°, 0.06°
                 radii = [0.02, 0.04, 0.06]
                 max_r = radii[-1]
 
-                # Draw concentric circles & place labels to the right of ring lines
+                # Draw concentric circles & labels (smaller font 7pt, not bold, shifted slightly left)
                 theta = np.linspace(0, 2 * np.pi, 300)
                 for r in radii:
                     ax.plot(
@@ -96,13 +99,13 @@ def plot():
                         zorder=1,
                     )
                     ax.text(
-                        r + 0.0015,
+                        r + 0.0006,
                         -0.0035,
                         f'{r:.2f}°',
                         ha='left',
                         va='top',
-                        fontsize=8,
-                        fontweight='bold',
+                        fontsize=7,
+                        fontweight='normal',
                         zorder=4,
                     )
 
@@ -279,40 +282,44 @@ def plot():
                     fontweight='bold',
                 )
 
-                # --- Legend Area with 30 mph Reference Arrow (Text Labels Deleted) ---
-                ax_leg = fig.add_axes([0.08, 0.04, 0.35, 0.12])
+                # --- Legend Box: 30 mph and 40 mph Reference Arrows ---
+                ax_leg = fig.add_axes([0.08, 0.02, 0.35, 0.16])
                 ax_leg.set_xlim(0, 1)
                 ax_leg.set_ylim(0, 1)
                 ax_leg.axis('off')
 
-                # Dot & 30 mph reference arrow pointing ~45 degrees (NE)
-                dot_x, dot_y = 0.20, 0.40
-                ax_leg.scatter(
-                    [dot_x], [dot_y], color='mediumturquoise', s=30, zorder=3
-                )
-
-                ref_gust = 30.0  # Updated to 30 mph
-                ref_len_pt = (
-                    min_tail_pt
-                    + max(0.0, ref_gust - min_gust_ref) * scale_rate
-                )
                 ref_angle_rad = np.radians(45)
 
-                dx_pt = np.cos(ref_angle_rad) * ref_len_pt
-                dy_pt = np.sin(ref_angle_rad) * ref_len_pt
+                # 1. 30 mph Reference Arrow
+                dot30_x, dot30_y = 0.15, 0.70
+                ax_leg.scatter(
+                    [dot30_x],
+                    [dot30_y],
+                    color='mediumturquoise',
+                    s=30,
+                    zorder=3,
+                )
 
-                trans_leg = offset_copy(
+                ref30_gust = 30.0
+                ref30_len_pt = (
+                    min_tail_pt
+                    + max(0.0, ref30_gust - min_gust_ref) * scale_rate
+                )
+                dx30_pt = np.cos(ref_angle_rad) * ref30_len_pt
+                dy30_pt = np.sin(ref_angle_rad) * ref30_len_pt
+
+                trans_leg30 = offset_copy(
                     ax_leg.transData,
                     fig=fig,
-                    x=dx_pt / 2.0,
-                    y=dy_pt / 2.0,
+                    x=dx30_pt / 2.0,
+                    y=dy30_pt / 2.0,
                     units='points',
                 )
                 ax_leg.annotate(
                     '',
-                    xy=(dot_x, dot_y),
-                    xycoords=trans_leg,
-                    xytext=(-dx_pt, -dy_pt),
+                    xy=(dot30_x, dot30_y),
+                    xycoords=trans_leg30,
+                    xytext=(-dx30_pt, -dy30_pt),
                     textcoords='offset points',
                     arrowprops=dict(
                         arrowstyle='->,head_length=0.2,head_width=0.15',
@@ -321,30 +328,68 @@ def plot():
                     ),
                     zorder=4,
                 )
-
-                # Reference arrow labels (N indicator & 30 mph speed)
                 ax_leg.text(
-                    dot_x - 0.05,
-                    dot_y + 0.25,
-                    'N',
-                    fontsize=8,
-                    color='red',
-                    fontweight='bold',
-                )
-                ax_leg.text(
-                    dot_x + 0.18,
-                    dot_y - 0.10,
+                    dot30_x + 0.18,
+                    dot30_y - 0.05,
                     '30 mph',
-                    fontsize=9,
+                    fontsize=8,
                     va='center',
                     fontweight='bold',
                 )
 
-                plt.subplots_adjust(
-                    left=0.08, right=0.82, bottom=0.18, top=0.88
+                # 2. 40 mph Reference Arrow
+                dot40_x, dot40_y = 0.15, 0.25
+                ax_leg.scatter(
+                    [dot40_x],
+                    [dot40_y],
+                    color='mediumturquoise',
+                    s=30,
+                    zorder=3,
                 )
 
-                # Save image using sanitized filename (dpi=100 ensures < 1M total pixels)
+                ref40_gust = 40.0
+                ref40_len_pt = (
+                    min_tail_pt
+                    + max(0.0, ref40_gust - min_gust_ref) * scale_rate
+                )
+                dx40_pt = np.cos(ref_angle_rad) * ref40_len_pt
+                dy40_pt = np.sin(ref_angle_rad) * ref40_len_pt
+
+                trans_leg40 = offset_copy(
+                    ax_leg.transData,
+                    fig=fig,
+                    x=dx40_pt / 2.0,
+                    y=dy40_pt / 2.0,
+                    units='points',
+                )
+                ax_leg.annotate(
+                    '',
+                    xy=(dot40_x, dot40_y),
+                    xycoords=trans_leg40,
+                    xytext=(-dx40_pt, -dy40_pt),
+                    textcoords='offset points',
+                    arrowprops=dict(
+                        arrowstyle='->,head_length=0.2,head_width=0.15',
+                        color='black',
+                        lw=0.8,
+                    ),
+                    zorder=4,
+                )
+                ax_leg.text(
+                    dot40_x + 0.22,
+                    dot40_y - 0.05,
+                    '40 mph',
+                    fontsize=8,
+                    va='center',
+                    fontweight='bold',
+                )
+
+                # Adjusted figure margins to ensure title and labels are well within bounds
+                plt.subplots_adjust(
+                    left=0.12, right=0.82, bottom=0.18, top=0.84
+                )
+
+                # Save image using sanitized filename (dpi=100 ensures image size < 1MB)
                 safe_filename = (
                     ''.join(
                         c
