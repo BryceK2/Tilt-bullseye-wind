@@ -68,7 +68,7 @@ def plot():
                 xplot = x_raw * np.cos(theta_rad) - y_raw * np.sin(theta_rad)
                 yplot = x_raw * np.sin(theta_rad) + y_raw * np.cos(theta_rad)
 
-                fig, ax = plt.subplots(figsize=(7.5, 7.5))
+                fig, ax = plt.subplots(figsize=(5.0, 5.0))
 
                 # Strictly format title onto two lines
                 if ' Phase' in sensor_id:
@@ -375,7 +375,15 @@ def plot():
                     safe_filename = f'plot_{idx + 1}'
 
                 buf = io.BytesIO()
-                plt.savefig(buf, format='png', dpi=100, transparent=True)
+                plt.savefig(
+                    buf, 
+                    format='png', 
+                    dpi=150, 
+                    transparent=True, 
+                    bbox_inches='tight',
+                    pad_inches=0.1,              
+                    pil_kwargs={'optimize': True}
+                )
                 plt.close(fig)
                 buf.seek(0)
 
