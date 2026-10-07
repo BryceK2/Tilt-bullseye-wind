@@ -148,32 +148,11 @@ def plot():
 
                     # Colorbar
                     month_starts = [
-                        1,
-                        32,
-                        60,
-                        91,
-                        121,
-                        152,
-                        182,
-                        213,
-                        244,
-                        274,
-                        305,
-                        335,
+                        1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335,
                     ]
                     month_labels = [
-                        'Jan',
-                        'Feb',
-                        'Mar',
-                        'Apr',
-                        'May',
-                        'Jun',
-                        'Jul',
-                        'Aug',
-                        'Sep',
-                        'Oct',
-                        'Nov',
-                        'Dec',
+                        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
                     ]
 
                     cbar = plt.colorbar(sc, ax=ax, pad=0.12, shrink=0.75)
@@ -295,62 +274,89 @@ def plot():
                     fontweight='bold',
                 )
 
-                # --- Legend Box: 40 mph Reference Arrow Only ---
-                ax_leg = fig.add_axes([0.08, 0.02, 0.35, 0.12])
+                # --- Legend Box: 30, 45, 60 mph Reference Arrows ---
+                # Subplot axes slightly widened and heightened to comfortably fit 3 rows
+                ax_leg = fig.add_axes([0.06, 0.02, 0.42, 0.16])
                 ax_leg.set_xlim(0, 1)
                 ax_leg.set_ylim(0, 1)
                 ax_leg.axis('off')
 
                 ref_angle_rad = np.radians(45)
 
-                # 40 mph Reference Arrow
-                dot40_x, dot40_y = 0.15, 0.50
-                ax_leg.scatter(
-                    [dot40_x],
-                    [dot40_y],
-                    color='mediumturquoise',
-                    s=30,
-                    zorder=3,
-                )
+                # List of references to iterate over: (gust_speed, y_position_in_legend_box)
+                reference_speeds = [
+                    (60.0, 0.82), 
+                    (45.0, 0.50), 
+                    (30.0, 0.18)
+                ]
 
-                ref40_gust = 40.0
-                ref40_len_pt = (
-                    min_tail_pt
-                    + max(0.0, ref40_gust - min_gust_ref) * scale_rate
-                )
-                dx40_pt = np.cos(ref_angle_rad) * ref40_len_pt
-                dy40_pt = np.sin(ref_angle_rad) * ref40_len_pt
+                # X-coordinates for the three elements (just arrow, dot+arrow, text)
+                arr_only_x = 0.15
+                dot_arr_x = 0.45
+                text_x = 0.70
 
-                trans_leg40 = offset_copy(
-                    ax_leg.transData,
-                    fig=fig,
-                    x=dx40_pt / 2.0,
-                    y=dy40_pt / 2.0,
-                    units='points',
-                )
-                ax_leg.annotate(
-                    '',
-                    xy=(dot40_x, dot40_y),
-                    xycoords=trans_leg40,
-                    xytext=(-dx40_pt, -dy40_pt),
-                    textcoords='offset points',
-                    arrowprops=dict(
-                        arrowstyle='->,head_length=0.2,head_width=0.15',
-                        color='black',
-                        lw=0.8,
-                    ),
-                    zorder=4,
-                )
-                ax_leg.text(
-                    dot40_x + 0.22,
-                    dot40_y - 0.05,
-                    '40 mph',
-                    fontsize=8,
-                    va='center',
-                    fontweight='bold',
-                )
+                for ref_gust, y_pos in reference_speeds:
+                    # Calculate arrow length and point offsets based on gust speed
+                    ref_len_pt = min_tail_pt + max(0.0, ref_gust - min_gust_ref) * scale_rate
+                    dx_pt = np.cos(ref_angle_rad) * ref_len_pt
+                    dy_pt = np.sin(ref_angle_rad) * ref_len_pt
 
-                # Subplot margins adjusted to complement the lowered title
+                    trans_leg = offset_copy(
+                        ax_leg.transData,
+                        fig=fig,
+                        x=dx_pt / 2.0,
+                        y=dy_pt / 2.0,
+                        units='points',
+                    )
+
+                    # 1. Just the arrow (no dot) on the left
+                    ax_leg.annotate(
+                        '',
+                        xy=(arr_only_x, y_pos),
+                        xycoords=trans_leg,
+                        xytext=(-dx_pt, -dy_pt),
+                        textcoords='offset points',
+                        arrowprops=dict(
+                            arrowstyle='->,head_length=0.2,head_width=0.15',
+                            color='black',
+                            lw=0.8,
+                        ),
+                        zorder=4,
+                    )
+
+                    # 2. Dot and arrow in the middle
+                    ax_leg.scatter(
+                        [dot_arr_x],
+                        [y_pos],
+                        color='mediumturquoise',
+                        s=30,
+                        zorder=3,
+                    )
+                    ax_leg.annotate(
+                        '',
+                        xy=(dot_arr_x, y_pos),
+                        xycoords=trans_leg,
+                        xytext=(-dx_pt, -dy_pt),
+                        textcoords='offset points',
+                        arrowprops=dict(
+                            arrowstyle='->,head_length=0.2,head_width=0.15',
+                            color='black',
+                            lw=0.8,
+                        ),
+                        zorder=4,
+                    )
+
+                    # 3. Text label on the right
+                    ax_leg.text(
+                        text_x,
+                        y_pos - 0.03,  # Slight visual vertical adjustment
+                        f'{int(ref_gust)} mph',
+                        fontsize=8,
+                        va='center',
+                        fontweight='bold',
+                    )
+
+                # Subplot margins adjusted to complement the lowered title and new legend
                 plt.subplots_adjust(
                     left=0.10, right=0.82, bottom=0.18, top=0.80
                 )
